@@ -2,6 +2,7 @@ import { Devvit, Dispatch, SetStateAction } from "@devvit/public-api";
 import { PostData } from "../data/types.js";
 
 type SingleImageViewProps = {
+  context: Devvit.Context;
   postData: PostData;
   setZoomPost: Dispatch<SetStateAction<PostData | null>>;
 };
@@ -10,9 +11,9 @@ export default function SingleImageView(props: SingleImageViewProps) {
   const { postData, setZoomPost } = props;
 
   const handleBackClick = () => {
-    setZoomPost(null)
+    setZoomPost(null);
   };
-  console.log("single image post triggered");
+  // console.log("single image post triggered");
   return (
     <vstack
       height="100%"

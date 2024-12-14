@@ -5,18 +5,35 @@ import {
   Dispatch,
   EnrichedThumbnail,
   GetHotPostsOptions,
+  Post,
+  RedditAPIClient,
   SetStateAction,
   useAsync,
   useState,
 } from "@devvit/public-api";
 import { BASE_SCORE } from "../main.js";
-import { GeneralData, ScoreBoardEntry } from "../data/types.js";
 import {
-  genAddScoreboardListing,
-  genGlobalScoreboard,
-} from "../../server/controllers/scoreboard.server.js";
+  GeneralData,
+  ScoreBoardEntry,
+  ScoreBoards,
+  GameOverPageType,
+  UXConfig,
+  ScoreHistoryItem,
+  PostedScoreObject,
+} from "../data/types.js";
+import { genPostScoreboardUpdates } from "../pseudo_server/controllers/scoreboard.js";
+import ScoreBoardRow from "./ScoreBoardRow.js";
+import ScoreBoardColumn from "./ScoreBoardColumn.js";
+import TradeGraph from "./TradeGraph.js";
+import { genStorePostedScoreHistory } from "../pseudo_server/controllers/submit_post.js";
+// import {
+//   genAddScoreboardListing,
+//   genGlobalScoreboard,
+// } from "../../server/controllers/scoreboard.js";
 
 type GameOverProps = {
+  scoreHistory: ScoreHistoryItem[];
+  UXConfig: UXConfig;
   context: Devvit.Context;
   currentScore: number;
   step: number;
@@ -27,9 +44,73 @@ type GameOverProps = {
 };
 
 export default function GameOver(props: GameOverProps) {
-  const handlePostResults = () => {};
+  const [postSubmitted, setPostSubmitted] = useState<boolean>(false);
+  const {
+    scoreHistory,
+    UXConfig,
+    context,
+    generalDataPayload,
+    current_score,
+    cashedOut,
+  } = props;
 
-  const { generalDataPayload, current_score, cashedOut } = props;
+  const {
+    data: posted,
+    error: postedError,
+    loading: postedLoading,
+  } = useAsync<string>(
+    async (): Promise<string> => {
+      console.log("THE POSTING WAS TRIGGERED");
+      console.log(postSubmitted);
+      if (postSubmitted) {
+        const new_post = await props.context.reddit.submitPost({
+          title: "My devvit post",
+          subredditName: props.generalDataPayload.subredditName,
+          // The preview appears while the post loads
+          preview: (
+            <vstack height="100%" width="100%" alignment="middle center">
+              <text size="large">Loading trading history...</text>
+            </vstack>
+          ),
+        });
+
+        const post_options: PostedScoreObject = {
+          scoreHistory: props.scoreHistory,
+          totalScore: props.currentScore,
+          numTrades: scoreHistory.length,
+          generalData: props.generalDataPayload,
+        };
+
+        await genStorePostedScoreHistory(
+          props.context,
+          post_options,
+          new_post.id
+        );
+
+        props.context.ui.showToast({ text: "Created post!" });
+        return new_post.id;
+      }
+      return "";
+    },
+    { depends: postSubmitted }
+  );
+
+  const handlePostResults = () => {
+    setPostSubmitted(true);
+  };
+
+  const goToPost = () => {
+    const url =
+      "https://www.reddit.com/r/" +
+      context.subredditName +
+      "/comments/" +
+      posted +
+      "/";
+    context.ui.navigateTo(url);
+  };
+
+  const [currentScoreBoardType, setCurrentScoreBoardType] =
+    useState<GameOverPageType>(GameOverPageType.OVERVIEW);
 
   //   const [scoreBoard, setScoreBoard] = useState<ScoreBoardEntry[] | null>(null);
   // //   const [error, setError] = useState<Error | null>(null);
@@ -37,7 +118,7 @@ export default function GameOver(props: GameOverProps) {
 
   //   (async () => {
   //     try {
-  //       console.log("Fetching scoreboard...");
+  //       // console.log("Fetching scoreboard...");
   //       const data = await genGlobalScoreboard(props.context);
   //       setScoreBoard(data);
   //     } catch (err) {
@@ -52,10 +133,10 @@ export default function GameOver(props: GameOverProps) {
   //     error: scoreBoardError,
   //     loading: scoreBoardLoading,
   //   } = useAsync<ScoreBoardEntry[]>(async () => {
-  //     console.log("Fetching scoreboard...");
+  //     // console.log("Fetching scoreboard...");
   //     try {
   //       const data = await genGlobalScoreboard(props.context);
-  //       console.log("Data received for scoreboard:", data);
+  //       // console.log("Data received for scoreboard:", data);
   //       return data; // Return the data directly
   //     } catch (error) {
   //       console.error("Error fetching scoreboard:", error);
@@ -68,7 +149,7 @@ export default function GameOver(props: GameOverProps) {
   //   error: scoreBoardError,
   //   loading: scoreBoardLoading,
   // } = useAsync<ScoreBoardEntry[]>(async () => {
-  //   console.log("Fetching scoreboard...");
+  //   // console.log("Fetching scoreboard...");
 
   //   return await genGlobalScoreboard(props.context);
   // }); // No "depends" means it runs on mount
@@ -77,35 +158,57 @@ export default function GameOver(props: GameOverProps) {
     data: scoreBoard,
     error: scoreBoardError,
     loading: scoreBoardLoading,
-  } = useAsync<ScoreBoardEntry[]>(async () => {
-    console.log("Fetching scoreboard...");
+  } = useAsync<ScoreBoards | null>(async () => {
+    // console.log("Fetching scoreboard...");
     if (generalDataPayload.username && current_score) {
-      console.log("attempting genAddScoreboardListing");
-      const data = await genAddScoreboardListing(
+      // console.log("attempting genAddScoreboardListing");
+      const data = await genPostScoreboardUpdates(
         props.context,
         generalDataPayload.subredditName,
         generalDataPayload.username,
         current_score
       );
-      console.log("DATA GENERATED IN COMPONENT");
-      console.log(data);
-      return data.slice(0,10);
+      // console.log("DATA GENERATED IN COMPONENT");
+      // console.log(data);
+      return data;
     }
-    return [];
+    return null;
   }); // No "depends" means it runs on mount
 
-  console.log("Scoreboard data");
-  console.log(scoreBoard);
-  console.log(scoreBoardError);
+  // console.log("Scoreboard data");
+  // console.log(scoreBoard);
+  // console.log(scoreBoardError);
 
   const outcome =
     props.currentScore > BASE_SCORE ? (
-      <text alignment="start middle" width="100%" style="heading" wrap={true}>
+      <text
+        alignment="start middle"
+        width="100%"
+        style="heading"
+        wrap={true}
+        size={UXConfig.largeFont}
+      >
         Nice trading snoo, you made a profit!
       </text>
-    ) : (
-      <text alignment="start middle" width="100%" style="heading" wrap={true}>
+    ) : props.currentScore > 0 ? (
+      <text
+        alignment="start middle"
+        width="100%"
+        style="heading"
+        wrap={true}
+        size={UXConfig.largeFont}
+      >
         Uh oh... there goes the retirement fund...
+      </text>
+    ) : (
+      <text
+        alignment="start middle"
+        width="100%"
+        style="heading"
+        wrap={true}
+        size={UXConfig.largeFont}
+      >
+        What have you done... how will we afford rent!?
       </text>
     );
 
@@ -117,14 +220,14 @@ export default function GameOver(props: GameOverProps) {
   //   // Function to fetch data
   //   const fetchScoreboard = async () => {
   //     try {
-  //       console.log("Fetching scoreboard...");
+  //       // console.log("Fetching scoreboard...");
   //       const data = await genGlobalScoreboard(props.context);
 
   //       if (data && data.length > 0) {
-  //         console.log("Data received for scoreboard:", data);
+  //         // console.log("Data received for scoreboard:", data);
   //         setScoreBoard(data);
   //       } else {
-  //         console.log("No data found for scoreboard.");
+  //         // console.log("No data found for scoreboard.");
   //         setScoreBoard([]);
   //       }
   //     } catch (err) {
@@ -138,7 +241,10 @@ export default function GameOver(props: GameOverProps) {
   // Conditional rendering
   //   if (loading) return <div>Loading...</div>;
   //   if (error) return <div>Error: {error.message}</div>;
-  if (!scoreBoard || scoreBoard.length === 0)
+  // console.log("Right before early return");
+  // console.log(scoreBoard);
+  // console.log(currentScoreBoardType);
+  if (!scoreBoard)
     return (
       <hstack
         height="100%"
@@ -156,6 +262,31 @@ export default function GameOver(props: GameOverProps) {
       </hstack>
     );
 
+  const current_scoreboard =
+    currentScoreBoardType === GameOverPageType.GLOBAL
+      ? scoreBoard.globalScoreboard
+      : scoreBoard.subredditScoreboard;
+
+  // console.log("CURRENT SCOREBOARD TYPE");
+  // console.log(currentScoreBoardType);
+
+  // console.log("context.dimensions?.scale");
+  // console.log(context.dimensions?.scale);
+  // console.log("context.dimensions?.width");
+  // console.log(context.dimensions?.width);
+
+  const font_size =
+    (context.dimensions?.width ?? 0) < 400
+      ? "small"
+      : (context.dimensions?.width ?? 0) < 600
+      ? "medium"
+      : "large";
+
+  switch (currentScoreBoardType) {
+    case GameOverPageType.OVERVIEW: {
+    }
+  }
+
   return (
     <hstack
       height="100%"
@@ -170,320 +301,190 @@ export default function GameOver(props: GameOverProps) {
       //   maxHeight="80%"
     >
       <vstack
-        height="90%"
+        height="100%"
         width="100%"
         gap="medium"
         alignment="center middle"
         padding="small"
       >
-        {outcome}
-        <spacer />
+        <hstack>
+          <button
+            onPress={() => setCurrentScoreBoardType(GameOverPageType.OVERVIEW)}
+            appearance={
+              currentScoreBoardType === GameOverPageType.OVERVIEW
+                ? "primary"
+                : "secondary"
+            }
+            size={UXConfig.smallButtonSize}
+          >
+            Overview
+          </button>
+          <button
+            onPress={() => setCurrentScoreBoardType(GameOverPageType.GLOBAL)}
+            appearance={
+              currentScoreBoardType === GameOverPageType.GLOBAL
+                ? "primary"
+                : "secondary"
+            }
+            size={UXConfig.smallButtonSize}
+          >
+            Global
+          </button>
+          <button
+            onPress={() => setCurrentScoreBoardType(GameOverPageType.SUBREDDIT)}
+            appearance={
+              currentScoreBoardType === GameOverPageType.SUBREDDIT
+                ? "primary"
+                : "secondary"
+            }
+            size={UXConfig.smallButtonSize}
+          >
+            Sub
+          </button>
+        </hstack>
         <vstack
-          height="100%"
+          height="70%"
           width="100%"
           gap="none"
           alignment="center middle"
           padding="small"
         >
-          {/* {scoreBoard} */}
-          {scoreBoard && (
-            // scoreBoard.map((item: ScoreBoardEntry, i: number) => {
-            //   console.log("The map was triggered");
-            //   return (
+          {currentScoreBoardType === GameOverPageType.OVERVIEW ? (
+            <>
+              <hstack alignment="center middle">{outcome}</hstack>
+              <spacer />
+              <TradeGraph scoreHistory={scoreHistory} UXConfig={UXConfig} />
+              <spacer />
+              <hstack alignment="start middle">
+                <vstack>
+                  <text
+                    alignment="start middle"
+                    width="100%"
+                    size={UXConfig.largeFont}
+                    style="heading"
+                    grow={true}
+                  >
+                    Ending Balance:
+                  </text>{" "}
+                  <text
+                    alignment="start middle"
+                    width="100%"
+                    style="heading"
+                    size={UXConfig.largeFont}
+                  >
+                    Number of trades:
+                  </text>
+                </vstack>
+                <vstack>
+                  <text alignment="end middle" width="100%" style="heading">
+                    {props.currentScore}
+                  </text>
+                  <text alignment="end middle" width="100%" style="heading">
+                    {props.scoreHistory.length}
+                  </text>
+                </vstack>
+              </hstack>
+
+              {postSubmitted ? (
+                <button onPress={goToPost}>Go to post!</button>
+              ) : (
+                <button onPress={handlePostResults}>Post results!</button>
+              )}
+            </>
+          ) : (
             <hstack
               gap="none"
               borderColor="grey"
-              width="80%"
+              width={UXConfig.maxWidth}
               border="thin"
               cornerRadius="medium"
               padding="medium"
               lightBackgroundColor="AliceBlue"
               darkBackgroundColor="DarkSlateBlue"
             >
-              <vstack
-                // border="thin"
-                gap="none"
-                // borderColor="grey"
-                width="10%"
-                padding="none"
-                // grow={true}
+              <ScoreBoardColumn
+                UXConfig={UXConfig}
+                col_name="Rank"
+                col_width={"10%"}
+                grow={false}
               >
-                <hstack
-                  lightBackgroundColor="AliceBlue"
-                  darkBackgroundColor="DarkSlateBlue"
-                  // border="thin"
-                  gap="none"
-                  // borderColor="grey"
-                  width="100%"
-                  padding="none"
-                  alignment="center middle"
-                >
-                  <text
-                    alignment="center middle"
-                    style="heading"
-                    size="large"
-                    weight="bold"
-                  >
-                    Rank
-                  </text>
-                </hstack>
-                {scoreBoard.map((item: ScoreBoardEntry, i: number) => {
+                {current_scoreboard.map((item: ScoreBoardEntry, i: number) => {
                   return (
-                    <hstack
-                      backgroundColor={i % 2 === 0 ? "Teal" : "SteelBlue"}
-                      // border="thin"
-                      gap="none"
-                      // borderColor="grey"
-                      width="100%"
-                      padding="none"
-                      alignment="center middle"
-                    >
-                      <text
-                        alignment="center middle"
-                        style="body"
-                        size="large"
-                        weight="bold"
-                      >
-                        {i + 1}
-                      </text>
-                    </hstack>
+                    <ScoreBoardRow
+                      UXConfig={UXConfig}
+                      item={`${i + 1}`}
+                      idx={i}
+                    />
                   );
                 })}
-              </vstack>
-              <vstack
-                // border="thin"
-                gap="none"
-                // borderColor="grey"
-                width="40%"
-                padding="none"
+              </ScoreBoardColumn>
+              <ScoreBoardColumn
+                UXConfig={UXConfig}
+                col_name="User"
+                col_width={"40%"}
                 grow={true}
-                alignment="center middle"
               >
-                <hstack
-                  lightBackgroundColor="AliceBlue"
-                  darkBackgroundColor="DarkSlateBlue"
-                  // border="thin"
-                  gap="none"
-                  // borderColor="grey"
-                  width="100%"
-                  padding="none"
-                  alignment="center middle"
-                >
-                  <text
-                    alignment="center middle"
-                    style="heading"
-                    size="large"
-                    weight="bold"
-                  >
-                    User
-                  </text>
-                </hstack>
-                {scoreBoard.map((item: ScoreBoardEntry, i: number) => {
+                {current_scoreboard.map((item: ScoreBoardEntry, i: number) => {
                   return (
-                    <hstack
-                      backgroundColor={i % 2 === 0 ? "Teal" : "SteelBlue"}
-                      // border="thin"
-                      gap="none"
-                      // borderColor="grey"
-                      width="100%"
-                      padding="none"
-                      alignment="center middle"
-                    >
-                      <text
-                        alignment="center middle"
-                        style="body"
-                        size="large"
-                        weight="bold"
-                      >
-                        {item.member.username}
-                      </text>
-                    </hstack>
+                    <ScoreBoardRow
+                      UXConfig={UXConfig}
+                      item={item.member.username}
+                      idx={i}
+                    />
                   );
                 })}
-              </vstack>
-              <vstack
-                // border="thin"
-                gap="none"
-                // borderColor="grey"
-                width="30%"
-                padding="none"
+              </ScoreBoardColumn>
+              <ScoreBoardColumn
+                UXConfig={UXConfig}
+                col_name="Subreddit"
+                col_width={"30%"}
                 grow={true}
-                alignment="center middle"
               >
-                <hstack
-                  lightBackgroundColor="AliceBlue"
-                  darkBackgroundColor="DarkSlateBlue"
-                  // border="thin"
-                  gap="none"
-                  // borderColor="grey"
-                  width="100%"
-                  padding="none"
-                  alignment="center middle"
-                >
-                  <text
-                    alignment="center middle"
-                    style="heading"
-                    size="large"
-                    weight="bold"
-                  >
-                    Subreddit
-                  </text>
-                </hstack>
-                {scoreBoard.map((item: ScoreBoardEntry, i: number) => {
+                {current_scoreboard.map((item: ScoreBoardEntry, i: number) => {
                   return (
-                    <hstack
-                      backgroundColor={i % 2 === 0 ? "Teal" : "SteelBlue"}
-                      // border="thin"
-                      gap="none"
-                      // borderColor="grey"
-                      width="100%"
-                      padding="none"
-                      alignment="center middle"
-                    >
-                      <text
-                        alignment="center middle"
-                        style="body"
-                        size="large"
-                        weight="bold"
-                      >
-                        {item.member.subredditName}
-                      </text>
-                    </hstack>
+                    <ScoreBoardRow
+                      UXConfig={UXConfig}
+                      item={item.member.subredditName}
+                      idx={i}
+                    />
                   );
                 })}
-              </vstack>
-              <vstack
-                // border="thin"
-                gap="none"
-                // borderColor="grey"
-                width="20%"
-                padding="none"
-                alignment="center middle"
-
-                // grow={true}
+              </ScoreBoardColumn>
+              <ScoreBoardColumn
+                UXConfig={UXConfig}
+                col_name="Date"
+                col_width={"10%"}
+                grow={false}
               >
-                <hstack
-                  lightBackgroundColor="AliceBlue"
-                  darkBackgroundColor="DarkSlateBlue"
-                  // border="thin"
-                  gap="none"
-                  // borderColor="grey"
-                  width="100%"
-                  padding="none"
-                  alignment="center middle"
-                >
-                  <text
-                    alignment="center middle"
-                    style="heading"
-                    size="large"
-                    weight="bold"
-                  >
-                    Date
-                  </text>
-                </hstack>
-                {scoreBoard.map((item: ScoreBoardEntry, i: number) => {
+                {current_scoreboard.map((item: ScoreBoardEntry, i: number) => {
                   return (
-                    <hstack
-                      backgroundColor={i % 2 === 0 ? "Teal" : "SteelBlue"}
-                      // border="thin"
-                      gap="none"
-                      // borderColor="grey"
-                      width="100%"
-                      padding="none"
-                      alignment="center middle"
-                    >
-                      <text
-                        alignment="center middle"
-                        style="body"
-                        size="large"
-                        weight="bold"
-                      >
-                        {item.member.dateKey}
-                      </text>{" "}
-                    </hstack>
+                    <ScoreBoardRow
+                      UXConfig={UXConfig}
+                      item={item.member.dateKey}
+                      idx={i}
+                    />
                   );
                 })}
-              </vstack>
-              <vstack
-                // border="thin"
-                gap="none"
-                // borderColor="grey"
-                width="20%"
-                padding="none"
-                alignment="center middle"
-
-                // grow={true}
+              </ScoreBoardColumn>
+              <ScoreBoardColumn
+                UXConfig={UXConfig}
+                col_name="Scores"
+                col_width={"10%"}
+                grow={false}
               >
-                <hstack
-                  lightBackgroundColor="AliceBlue"
-                  darkBackgroundColor="DarkSlateBlue"
-                  // border="thin"
-                  gap="none"
-                  // borderColor="grey"
-                  width="100%"
-                  padding="none"
-                  alignment="center middle"
-                >
-                  <text
-                    alignment="center middle"
-                    style="heading"
-                    size="large"
-                    weight="bold"
-                  >
-                    Score
-                  </text>
-                </hstack>
-                {scoreBoard.map((item: ScoreBoardEntry, i: number) => {
+                {current_scoreboard.map((item: ScoreBoardEntry, i: number) => {
                   return (
-                    <hstack
-                      backgroundColor={i % 2 === 0 ? "Teal" : "SteelBlue"}
-                      // border="thin"
-                      gap="none"
-                      // borderColor="grey"
-                      width="100%"
-                      padding="none"
-                      alignment="center middle"
-                    >
-                      <text
-                        alignment="center middle"
-                        style="body"
-                        size="large"
-                        weight="bold"
-                      >
-                        {item.score}
-                      </text>{" "}
-                    </hstack>
+                    <ScoreBoardRow
+                      UXConfig={UXConfig}
+                      item={`${item.score}`}
+                      idx={i}
+                    />
                   );
                 })}
-              </vstack>
+              </ScoreBoardColumn>
             </hstack>
           )}
         </vstack>
-        <hstack alignment="start middle">
-          <vstack>
-            <text
-              alignment="start middle"
-              width="100%"
-              style="heading"
-              grow={true}
-            >
-              Ending Balance:
-            </text>{" "}
-            <text alignment="start middle" width="100%" style="heading">
-              Number of trades:
-            </text>
-          </vstack>
-          <vstack>
-            <text alignment="end middle" width="100%" style="heading">
-              {props.currentScore}
-            </text>
-            <text alignment="end middle" width="100%" style="heading">
-              {props.step}
-            </text>
-          </vstack>
-        </hstack>
-
-        <button onPress={handlePostResults}>Post results!</button>
       </vstack>
     </hstack>
   );

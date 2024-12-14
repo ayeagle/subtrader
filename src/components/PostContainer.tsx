@@ -9,9 +9,12 @@ import {
   useAsync,
   useState,
 } from "@devvit/public-api";
-import { PostData, ScoreHistoryItem } from "../data/types.js";
+import { PostData, ScoreHistoryItem, UXConfig } from "../data/types.js";
+import { add_new_and_calculate_score } from "../data/score_calculator.js";
+import { BASE_SCORE } from "../main.js";
 
 type PostContainerProps = {
+  UXConfig: UXConfig;
   postData: PostData;
   otherPostData: PostData;
   scoreHistory: ScoreHistoryItem[];
@@ -31,10 +34,13 @@ type PostContainerProps = {
   orientation: string;
   postBuy: boolean;
   setPostBuy: Dispatch<SetStateAction<boolean>>;
+  lastScoreChange: number;
+  setLastScoreChange: Dispatch<SetStateAction<number>>;
 };
 
 export default function PostContainer(props: PostContainerProps) {
   const {
+    UXConfig,
     postData,
     otherPostData,
     context,
@@ -51,16 +57,36 @@ export default function PostContainer(props: PostContainerProps) {
     orientation,
     postBuy,
     setPostBuy,
+    lastScoreChange,
+    setLastScoreChange,
   } = props;
 
   const handlePostBuy = (): void => {
     setPostsBought([...postsBought, postData]);
     setScoreDelta(score + (postData.score - otherPostScore));
     setPostBuy(true);
-    setScoreHistory([
-      ...scoreHistory,
-      { selected: postData, other: otherPostData },
-    ]);
+
+    // console.log("OLD SCORE HISTORY");
+    // console.log(props.scoreHistory);
+    // console.log(scoreHistory);
+
+    const new_score_entry = add_new_and_calculate_score(
+      postData,
+      otherPostData,
+      scoreHistory
+    );
+
+    console.log("new_score_entry");
+    console.log(new_score_entry);
+    console.log("new score to be shown");
+    console.log(new_score_entry.cumScore);
+
+    // console.log("new_score_history");
+    // console.log(new_score_entry);
+
+    setScore(new_score_entry.cumScore);
+    setScoreHistory((prevHistory) => [...prevHistory, new_score_entry]);
+    setLastScoreChange(new_score_entry.scoreChangeValue);
 
     // updateScore(postData.score - otherPostScore, setScore, getScore);
   };
@@ -80,6 +106,20 @@ export default function PostContainer(props: PostContainerProps) {
       border="thin"
       maxHeight="50%"
       //   maxHeight="80%"
+      darkBackgroundColor={
+        !postBuy
+          ? ""
+          : postData.score >= otherPostData.score
+          ? UXConfig.darkGreenColor
+          : UXConfig.darkRedColor
+      }
+      lightBackgroundColor={
+        !postBuy
+          ? ""
+          : postData.score >= otherPostData.score
+          ? UXConfig.lightGreenColor
+          : UXConfig.lightRedColor
+      }
     >
       <image
         url={postData.image.image.url}
@@ -111,7 +151,7 @@ export default function PostContainer(props: PostContainerProps) {
               width="100%"
               wrap={true}
               style="heading"
-              color={postData.score > otherPostData.score ? "green" : "red"}
+              // color={postData.score > otherPostData.score ? "green" : "red"}
             >
               {postData.score}
             </text>
@@ -229,9 +269,9 @@ export default function PostContainer(props: PostContainerProps) {
 
 //   function tick() {
 //     //   while (remainingDelta !== 0) {
-//     console.log("TICKING!");
-//     console.log(currentScore);
-//     console.log(remainingDelta);
+//     // console.log("TICKING!");
+//     // console.log(currentScore);
+//     // console.log(remainingDelta);
 //     if (remainingDelta === 0) return; // Exit if no delta remains
 
 //     let scoreIncrement = 0;
@@ -273,7 +313,7 @@ export default function PostContainer(props: PostContainerProps) {
 //   let currentScoreDelta = targetScoreDelta;
 
 //   while (currentScoreDelta !== 0) {
-//     console.log("LOOP IS RUNNING");
+//     // console.log("LOOP IS RUNNING");
 //     let scoreIncrement = 1;
 
 //     if (currentScoreDelta > 100) {
@@ -285,9 +325,9 @@ export default function PostContainer(props: PostContainerProps) {
 //     } else {
 //       scoreIncrement = 1;
 //     }
-//     console.log(`score delta ${currentScoreDelta}`);
-//     console.log(`score increment ${scoreIncrement}`);
-//     console.log(`current score ${getCurrentScore()}`);
+//     // console.log(`score delta ${currentScoreDelta}`);
+//     // console.log(`score increment ${scoreIncrement}`);
+//     // console.log(`current score ${getCurrentScore()}`);
 //     // Apply the increment
 //     setScore((prevScore) => prevScore + scoreIncrement);
 

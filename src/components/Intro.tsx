@@ -10,13 +10,17 @@ import {
   useState,
 } from "@devvit/public-api";
 import { BASE_SCORE } from "../main.js";
+import { UXConfig } from "../data/types.js";
 
 type IntroProps = {
+  UXConfig: UXConfig;
   step: number;
   setStep: Dispatch<SetStateAction<number>>;
 };
 
 export default function Intro(props: IntroProps) {
+  const { UXConfig } = props;
+
   const handlePostResults = () => {
     props.setStep(props.step + 1);
   };
@@ -36,7 +40,7 @@ export default function Intro(props: IntroProps) {
     >
       <vstack
         height="80%"
-        width="70%"
+        width={UXConfig.maxWidth}
         gap="medium"
         alignment="center middle"
         padding="medium"
@@ -45,36 +49,74 @@ export default function Intro(props: IntroProps) {
           alignment="center middle"
           width="100%"
           style="heading"
+          size={UXConfig.largeFont}
           wrap={true}
         >
           Welcome to Subtrader!
         </text>
+        {/* <image
+          url="trade_graph.png"
+          imageHeight="100px"
+          imageWidth="200px"
+        /> */}
         <vstack>
-          <text alignment="start middle" width="100%" style="body" wrap={true}>
+          <text
+            alignment="start middle"
+            width="100%"
+            style="body"
+            wrap={true}
+            size={UXConfig.smallFont}
+          >
             Prove your worth as top reddit post trader. Increase your account's
             value by guessing which post is more popular in your community.
           </text>{" "}
           <spacer />
-          <text alignment="start middle" width="100%" style="body" wrap={true}>
-            1. The closer two posts are in popularity, the higher the reward 🚀 for
-            being right.
+          <text
+            alignment="start middle"
+            width="100%"
+            style="body"
+            wrap={true}
+            size={UXConfig.smallFont}
+          >
+            1. The closer two posts are in popularity, the higher the reward 🚀
+            for being right.
           </text>
           <spacer />
-          <text alignment="start middle" width="100%" style="body" wrap={true}>
-            2. The further two posts are in popularity, the greater the loss 🔻 for
-            being wrong.
+          <text
+            alignment="start middle"
+            width="100%"
+            style="body"
+            wrap={true}
+            size={UXConfig.smallFont}
+          >
+            2. The further two posts are in popularity, the greater the loss 🔻
+            for being wrong.
           </text>{" "}
           <spacer />
-          <text alignment="start middle" width="100%" style="body" wrap={true}>
+          <text
+            alignment="start middle"
+            width="100%"
+            style="body"
+            wrap={true}
+            size={UXConfig.smallFont}
+          >
             3. Play for at least 5 trades, then cash out when you want and brag
             about your earnings.
           </text>{" "}
           <spacer />
-          <text alignment="start middle" width="100%" style="body" wrap={true}>
+          <text
+            alignment="start middle"
+            width="100%"
+            style="body"
+            wrap={true}
+            size={UXConfig.smallFont}
+          >
             Posts are updated each day -- Good luck!
           </text>
         </vstack>
-        <button onPress={handlePostResults}>Start trading</button>
+        <button onPress={handlePostResults} size={UXConfig.largeButtonSize}>
+          Start trading
+        </button>
       </vstack>
     </hstack>
   );
