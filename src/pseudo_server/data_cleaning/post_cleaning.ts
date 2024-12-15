@@ -1,5 +1,5 @@
 import { EnrichedThumbnail, Post } from "@devvit/public-api";
-import { PostData } from "../../src/data/types.js";
+import { PostData } from "../../data/types.js";
 
 export function getPostDataFromPostAndThumbnail(
   post: Post,

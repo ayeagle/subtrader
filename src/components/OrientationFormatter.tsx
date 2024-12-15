@@ -9,7 +9,7 @@ export default function OrientationFormatter(props: OrientationFormatterProps) {
   const screen_width = props.context.dimensions?.width ?? 0;
 
   if (screen_width > 300) {
-    console.log("Using horizontal stack");
+    // console.log("Using horizontal stack");
     return (
       <hstack
         height="80%"
@@ -22,7 +22,7 @@ export default function OrientationFormatter(props: OrientationFormatterProps) {
       </hstack>
     );
   } else {
-    console.log("Using vertical stack");
+    // console.log("Using vertical stack");
     return (
       <vstack
         height="80%"
