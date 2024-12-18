@@ -25,7 +25,6 @@ type PostContainerProps = {
   postsBought: PostData[];
   setPostsBought: Dispatch<SetStateAction<PostData[]>>;
   otherPostScore: number;
-  displayScore: number;
   score: number;
   setScore: Dispatch<SetStateAction<number>>;
   scoreDelta: number;
@@ -94,6 +93,11 @@ export default function PostContainer(props: PostContainerProps) {
     props.setZoomPost(postData);
   };
 
+  const selected_post_id =
+    scoreHistory.length === 0
+      ? ""
+      : scoreHistory[scoreHistory.length - 1].selected.id;
+
   return (
     <hstack
       height="100%"
@@ -107,14 +111,14 @@ export default function PostContainer(props: PostContainerProps) {
       maxHeight="50%"
       //   maxHeight="80%"
       darkBackgroundColor={
-        !postBuy
+        !postBuy || postData.id !== selected_post_id
           ? ""
           : postData.score >= otherPostData.score
           ? UXConfig.darkGreenColor
           : UXConfig.darkRedColor
       }
       lightBackgroundColor={
-        !postBuy
+        !postBuy || postData.id !== selected_post_id
           ? ""
           : postData.score >= otherPostData.score
           ? UXConfig.lightGreenColor
@@ -143,6 +147,7 @@ export default function PostContainer(props: PostContainerProps) {
               width="100%"
               wrap={true}
               style="heading"
+              size={UXConfig.smallFont}
             >
               {postData.title}
             </text>
@@ -163,6 +168,7 @@ export default function PostContainer(props: PostContainerProps) {
               width="100%"
               wrap={true}
               style="heading"
+              size={UXConfig.smallFont}
             >
               {postData.title}
             </text>

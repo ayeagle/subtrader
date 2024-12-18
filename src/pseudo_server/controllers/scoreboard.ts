@@ -9,7 +9,7 @@ import {
   PostData,
   ScoreBoardEntry,
   ScoreBoards,
- GameOverPageType,
+  GameOverPageType,
 } from "../../data/types.js";
 import { getPostDataFromPostAndThumbnail } from "../data_cleaning/post_cleaning.js";
 import {
@@ -352,30 +352,51 @@ import { GLOBAL_LEADERBOARD, TESTING_SUB_KEY } from "../consts.js";
 //   // return;
 // }
 
-export async function genPostScoreboardUpdates(
+export async function genScoreboardData(
   context: Devvit.Context,
   subredditName: string,
-  username: string,
-  score: number
+  username: string
 ): Promise<ScoreBoards> {
   subredditName = TESTING_SUB_KEY ?? subredditName;
-
-  // console.log("Updating scoreboards");
-  await genUpdateScoreboards(context, subredditName, username, score);
-  // console.log("getting scoreboards");
 
   const [global_scores, sub_scores] = await Promise.all([
     await genGetGlobalTopScoreboard(context),
     await genGetSubredditTopScoreboard(context, subredditName),
   ]);
-  // console.log("structuring");
+
+  const [sub_rank, global_rank] = await Promise.all([
+    await genSubredditRank(context, subredditName, username),
+    await genGlobalRank(context, subredditName, username),
+  ]);
 
   const scoreboards: ScoreBoards = {
     globalScoreboard: global_scores,
     subredditScoreboard: sub_scores,
+    globalRank: global_rank,
+    subredditRank: sub_rank,
   };
 
+  console.log("HOLY SHITPASTE");
+  console.log("HOLY SHITPASTE");
+  console.log("HOLY SHITPASTE");
+  console.log("HOLY SHITPASTE");
+  console.log("HOLY SHITPASTE");
+  console.log("HOLY SHITPASTE");
+  console.log("66666666666666666666666666666666666666666666");
+  console.log(scoreboards);
+
   return scoreboards;
+}
+
+export async function genAndPostScoreboardData(
+  context: Devvit.Context,
+  subredditName: string,
+  username: string,
+  score: number
+): Promise<ScoreBoards> {
+  await genUpdateScoreboards(context, subredditName, username, score);
+
+  return await genScoreboardData(context, subredditName, username);
 }
 
 export async function genUpdateScoreboards(
@@ -389,7 +410,7 @@ export async function genUpdateScoreboards(
   // console.log(subredditName);
 
   const member_key_raw_data: MemberKeyData = {
-    username: username + Math.floor(Math.random() * 100),
+    username: username, //+ Math.floor(Math.random() * 2),
     subredditName: subredditName,
     dateKey: getCurrentDateInPST(),
   };
@@ -420,10 +441,13 @@ export async function genUpdateScoreboards(
 export async function genGetGlobalTopScoreboard(
   context: Devvit.Context
 ): Promise<ScoreBoardEntry[]> {
+  console.log("Redis zrank get global scoreboard");
+  console.log(GLOBAL_LEADERBOARD);
+
   const top10GlobalScores = await context.redis.zRange(
     GLOBAL_LEADERBOARD,
     0,
-    10,
+    9,
     {
       by: "rank",
       reverse: true,
@@ -444,10 +468,12 @@ export async function genGetSubredditTopScoreboard(
   context: Devvit.Context,
   subredditName: string
 ): Promise<ScoreBoardEntry[]> {
+  console.log("Redis zrank get sub scoreboard");
+  console.log(subredditName);
   const top10SubredditScores = await context.redis.zRange(
     subredditName, // Key in Redis
     0,
-    10,
+    9,
     {
       by: "rank",
       reverse: true,
@@ -458,6 +484,111 @@ export async function genGetSubredditTopScoreboard(
   // console.log(top10SubredditScores);
 
   return getUnencodeMemberData(top10SubredditScores);
+}
+
+export async function genSubredditRank(
+  context: Devvit.Context,
+  subredditName: string,
+  username: string
+): Promise<ScoreBoardEntry | null> {
+  const member_key_raw_data: MemberKeyData = {
+    username: username, //+ Math.floor(Math.random() * 2),
+    subredditName: subredditName,
+    dateKey: getCurrentDateInPST(),
+  };
+  const member_key = getJSONMemberKeyData(member_key_raw_data);
+
+  console.log("Redis zScore zRank scoreboard");
+  console.log(subredditName);
+  console.log(member_key);
+
+  const [sub_score, sub_rank, total] = await Promise.all([
+    context.redis.zScore(subredditName, member_key),
+    context.redis.zRank(subredditName, member_key),
+    context.redis.zCard(subredditName),
+  ]);
+
+  if (!sub_score) {
+    return null;
+  }
+
+  const rank: ScoreBoardEntry = {
+    member: member_key_raw_data,
+    score: sub_score,
+    rank: total - (sub_rank ?? 0),
+  };
+
+  return rank;
+}
+
+export async function genCheckIfPlayedToday(
+  context: Devvit.Context,
+  subredditName: string,
+  username: string
+): Promise<boolean> {
+  const member_key_raw_data: MemberKeyData = {
+    username: username, //+ Math.floor(Math.random() * 2),
+    subredditName: subredditName,
+    dateKey: getCurrentDateInPST(),
+  };
+  const member_key = getJSONMemberKeyData(member_key_raw_data);
+
+  const [global_score] = await Promise.all([
+    context.redis.zScore(GLOBAL_LEADERBOARD, member_key),
+  ]);
+
+  if (global_score) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+export async function genGlobalRank(
+  context: Devvit.Context,
+  subredditName: string,
+  username: string
+): Promise<ScoreBoardEntry | null> {
+  const member_key_raw_data: MemberKeyData = {
+    username: username, //+ Math.floor(Math.random() * 2),
+    subredditName: subredditName,
+    dateKey: getCurrentDateInPST(),
+  };
+  const member_key = getJSONMemberKeyData(member_key_raw_data);
+
+  const [global_score, global_rank, total] = await Promise.all([
+    context.redis.zScore(GLOBAL_LEADERBOARD, member_key),
+    context.redis.zRank(GLOBAL_LEADERBOARD, member_key),
+    context.redis.zCard(GLOBAL_LEADERBOARD),
+  ]);
+
+  console.log("global_score");
+  console.log(global_score);
+  console.log("sub_sglobal_rankcore");
+  console.log(global_rank);
+  console.log("total");
+  console.log(total);
+  // TODO SCORES AND RANKS FOR ALL VS PERSONAL BEING PULLED FROM DIFFERENT TABLES I THINK
+  // TODO SCORES AND RANKS FOR ALL VS PERSONAL BEING PULLED FROM DIFFERENT TABLES I THINK
+  // TODO SCORES AND RANKS FOR ALL VS PERSONAL BEING PULLED FROM DIFFERENT TABLES I THINK
+  // TODO SCORES AND RANKS FOR ALL VS PERSONAL BEING PULLED FROM DIFFERENT TABLES I THINK
+  // TODO SCORES AND RANKS FOR ALL VS PERSONAL BEING PULLED FROM DIFFERENT TABLES I THINK
+  // TODO SCORES AND RANKS FOR ALL VS PERSONAL BEING PULLED FROM DIFFERENT TABLES I THINK
+  // TODO SCORES AND RANKS FOR ALL VS PERSONAL BEING PULLED FROM DIFFERENT TABLES I THINK
+
+  if (!global_score) {
+    return null;
+  }
+
+  const rank: ScoreBoardEntry = {
+    member: member_key_raw_data,
+    score: global_score,
+    rank: total - (global_rank ?? 0),
+  };
+
+  console.log("I HAVE DISCOVERED THE RANKS!!!!!!!");
+
+  return rank;
 }
 
 function getUnencodeMemberData(

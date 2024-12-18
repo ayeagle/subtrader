@@ -32,6 +32,8 @@ export type UXConfig = {
   darkRedColor: Devvit.Blocks.ColorString;
   lightGreenColor: Devvit.Blocks.ColorString;
   darkGreenColor: Devvit.Blocks.ColorString;
+  lightBackgroundColor: Devvit.Blocks.ColorString;
+  darkBackgroundColor: Devvit.Blocks.ColorString;
 };
 
 export type PostDataObject = Listing<Post> | null;
@@ -58,6 +60,7 @@ export type GeneralData = {
   currentPostId: string | null;
   currSub: CurrSubData | null;
   prevHistory: PostedScoreObject | null;
+  isViewerPoster: boolean;
   // postDataObject: PostDataObject;s
 };
 
@@ -70,11 +73,14 @@ export type MemberKeyData = {
 export type ScoreBoardEntry = {
   member: MemberKeyData;
   score: number;
+  rank?: number;
 };
 
 export type ScoreBoards = {
   globalScoreboard: ScoreBoardEntry[];
   subredditScoreboard: ScoreBoardEntry[];
+  globalRank: ScoreBoardEntry | null;
+  subredditRank: ScoreBoardEntry | null;
 };
 
 export type PostedScoreObject = {

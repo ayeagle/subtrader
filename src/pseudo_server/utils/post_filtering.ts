@@ -7,7 +7,7 @@ import {
 } from "../../data/types.js";
 import { FETCH_LOGS } from "./post_fetch.js";
 
-const MAX_POST_LENGTH = 50;
+const MAX_POST_LENGTH = 75;
 
 export function getIsPostEligible(
   post: Post,
@@ -31,7 +31,7 @@ export function getIsPostEligible(
     return false;
   }
 
-  if (post.score < 10) {
+  if (post.score < 5) {
     // Missing key data
     FETCH_LOGS.score_too_low++;
     return false;
@@ -42,7 +42,7 @@ export function getIsPostEligible(
   const width =
     (thumbnail?.image.width === 0 ? 1 : thumbnail?.image.width) ?? 1;
   const ratio = height / width;
-  if (ratio < 0.7 || ratio > 1.3) {
+  if (ratio < 0.6 || ratio > 1.4) {
     FETCH_LOGS.ratio_wrong++;
 
     // Weird ratios unsupported
@@ -53,8 +53,9 @@ export function getIsPostEligible(
 }
 
 export function filterAndSortPosts(posts: PostData[] | null): PostData[] {
-  return posts?.filter(Boolean) as PostData[];
-  // ?.sort((a, b) => (Math.random() > 0.5 ? 1 : -1))
+  return posts
+    ?.sort((a, b) => (Math.random() > 0.5 ? 1 : -1))
+    ?.filter(Boolean) as PostData[];
 }
 
 export function getCurrentDateInPST() {

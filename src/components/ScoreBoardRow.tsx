@@ -11,7 +11,7 @@ export default function ScoreBoardRow(props: ScoreBoardColumnProps) {
   const { UXConfig, item, idx } = props;
   return (
     <hstack
-      backgroundColor={idx % 2 === 0 ? "Teal" : "SteelBlue"}
+      backgroundColor={idx % 2 === 0 ? "CadetBlue" : "DarkSeaGreen"}
       // border="thin"
       gap="none"
       // borderColor="grey"

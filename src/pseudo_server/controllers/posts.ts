@@ -3,6 +3,7 @@ import {
   EnrichedThumbnail,
   GetHotPostsOptions,
   GetPostsOptions,
+  GetPostsOptionsWithTimeframe,
   Listing,
   Post,
 } from "@devvit/public-api";
@@ -57,8 +58,12 @@ export async function genPostsForSubreddit(
     await genUpdateWithNewPostsData(context, subredditName, sub_data.postData);
   } else {
     console.log("Gathering stored posts");
+    console.log(postsIds);
 
     const gathered_posts = await genGatherPostsForSubreddit(context, postsIds);
+    console.log("gathered posts");
+    console.log(gathered_posts);
+    console.log(gathered_posts[gathered_posts.length - 1].id);
     sub_data = {
       name: subredditName,
       postData: gathered_posts,
@@ -78,13 +83,6 @@ export async function genAdditionalPostsForSubreddit(
   subredditName = TESTING_SUB_KEY ?? subredditName;
 
   const lookup_key = getJSONSubredditDateKey(subredditName);
-  const postsIds = (await context.redis.hGet(lookup_key, POST_IDS_KEY)) ?? "";
-  // console.log("Get additional posts lookup and postids");
-  // console.log(lookup_key);
-  // console.log(postsIds.length);
-  console.log("addt post 2");
-
-  const post_ids_set = new Set(getUnmarshalledPostIDs(postsIds));
 
   // console.log("Post ids SET");
   // console.log(post_ids_set.size);
@@ -98,13 +96,29 @@ export async function genAdditionalPostsForSubreddit(
   );
   console.log("addt post 3");
 
-  const deduped_posts = new_curr_sub_data.postData.filter(
-    (post) => !post_ids_set.has(post.id)
-  );
-  const full_post_ids_list = [
-    ...post_ids_set,
-    ...deduped_posts.map((post) => post.id),
-  ];
+  let full_post_ids_list: string[] = [];
+  let deduped_posts: PostData[] = [];
+
+  const postsIds = (await context.redis.hGet(lookup_key, POST_IDS_KEY)) ?? "";
+  // console.log("Get additional posts lookup and postids");
+  // console.log(lookup_key);
+  // console.log(postsIds.length);
+
+  if (postsIds) {
+    console.log("addt post 2");
+    console.log("post ids or whatever");
+    console.log(postsIds);
+
+    const post_ids_set = new Set(getUnmarshalledPostIDs(postsIds));
+
+    deduped_posts = new_curr_sub_data.postData.filter(
+      (post) => !post_ids_set.has(post.id)
+    );
+    full_post_ids_list = [
+      ...post_ids_set,
+      ...deduped_posts.map((post) => post.id),
+    ];
+  }
   console.log("addt post 4");
 
   console.log("full additional post ids list");
@@ -168,6 +182,14 @@ async function genTopPostsForSubreddit(
   //   console.log("Fetching new posts");
 
   let post_listing_object: Listing<Post>;
+  console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+
+  console.log("SOURCE BEING USED FOR FETCHING");
+  console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  console.log(source);
+  console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  console.log(subredditName);
+  console.log(lastCursor);
 
   const existingPostData = await getPostDataObject(
     context,
@@ -175,23 +197,35 @@ async function genTopPostsForSubreddit(
     lastCursor,
     source
   );
+  console.log("before posts");
+
   const posts = await fetchPosts(existingPostData, 100);
 
   FETCH_LOGS.fetched += posts.length;
   // }
+  console.log("after posts");
 
   // Filter posts with images
   const postsWithImages = await filterPostsWithImages(posts);
+  console.log("after images");
 
   // Sort and return
   const filteredPosts = filterAndSortPosts(postsWithImages);
 
   console.log("Post fetching complete:", filteredPosts.length);
+  console.log("last cursor");
+  console.log(lastCursor);
+  console.log("posts");
+  console.log(posts.length);
+  console.log("filteredPosts");
+  console.log(filteredPosts.length);
+  console.log("posts[posts.length - 1].id");
+  console.log(posts[posts.length - 1]?.id);
 
   return {
     name: subredditName,
     postData: filteredPosts,
-    lastCursor: posts[posts.length - 1].id,
+    lastCursor: posts[posts.length - 1]?.id ?? "",
   };
 }
 
@@ -225,12 +259,16 @@ async function filterPostsWithImages(allposts: Post[]): Promise<PostData[]> {
     await Promise.all(
       allposts.map(async (post) => {
         const thumbnail = await post.getEnrichedThumbnail();
-        if (getIsPostEligible(post, thumbnail)) {
-          return getPostDataFromPostAndThumbnail(post, thumbnail);
-        } else {
-          FETCH_LOGS.discarded++;
-          return null;
-        }
+        // try {
+          if (getIsPostEligible(post, thumbnail)) {
+            return getPostDataFromPostAndThumbnail(post, thumbnail);
+          } else {
+            FETCH_LOGS.discarded++;
+            return null;
+          }
+        // } catch {
+        //   return null;
+        // }
       })
     )
   ).filter((item): item is PostData => item !== null);
@@ -240,13 +278,15 @@ function getPostFetchConfig(
   subredditName: string,
   lastCursor: string
 ): GetPostsOptions {
-  let options: GetPostsOptions;
+  let options: GetPostsOptionsWithTimeframe;
   console.log("THE LAST CURSOR: ", lastCursor);
-  if (lastCursor === "") {
+  if (!lastCursor || lastCursor === "") {
     options = {
       subredditName: TESTING_SUB_KEY ?? subredditName,
       limit: 250,
       pageSize: 100,
+      timeframe: 'week'
+      
     };
   } else {
     options = {
@@ -254,6 +294,7 @@ function getPostFetchConfig(
       limit: 250,
       pageSize: 100,
       after: lastCursor,
+      timeframe: 'week'
     };
   }
   return options;
@@ -282,6 +323,7 @@ async function getPostDataObject(
   source: SubDataSource
 ) {
   const options = getPostFetchConfig(subredditName, lastCursor);
+  console.log(options);
 
   switch (source) {
     case SubDataSource.TOP:

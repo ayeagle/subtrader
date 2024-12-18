@@ -50,16 +50,18 @@ export async function genRetrievePostedScoreHistory(
 ): Promise<PostedScoreObject | null> {
   let subredditName = TESTING_SUB_KEY ?? context.subredditName;
 
+  console.log("attempting to retrieve post history");
+
   const stored_data = await context.redis.hGet(POSTED_SCORES_KEY, postId);
   if (!stored_data) {
     console.log("stored data is null");
     return null;
   }
 
-  console.log("STORED DATA");
-  console.log(stored_data);
-  console.log("stored_data");
-  console.log(getUnmarshalledPostedScoreObject(stored_data ?? ""));
+  // console.log("STORED DATA");
+  // console.log(stored_data);
+  // console.log("stored_data");
+  // console.log(getUnmarshalledPostedScoreObject(stored_data ?? ""));
 
   return getUnmarshalledPostedScoreObject(
     stored_data ?? ""
