@@ -17,7 +17,7 @@ export default function TradeGraph(props: TradeGraphProps) {
   return (
     <hstack
       height="30%"
-      width={`${Math.min(scoreHistory.length * 20, 80)}%`}
+      width={`${Math.min(scoreHistory.length * 20, 60)}%`}
       alignment="center middle"
     >
       {scoreHistory.map((item, index) => {
@@ -53,8 +53,12 @@ export default function TradeGraph(props: TradeGraphProps) {
 
             {/* Gain or loss bar */}
             <vstack
-              backgroundColor={
+
+              darkBackgroundColor={
                 change > 0 ? UXConfig.darkGreenColor : UXConfig.darkRedColor
+              }
+             lightBackgroundColor={
+                change > 0 ? UXConfig.lightGreenColor : UXConfig.lightRedColor
               }
               height={`${barHeight}%`}
               width="100%"

@@ -4,19 +4,19 @@ import { ScoreBoardEntry, ScoreBoards, UXConfig } from "../data/types.js";
 type ScoreBoardColumnProps = {
   UXConfig: UXConfig;
   col_name: string;
-  col_width: Devvit.Blocks.SizeString;
+  // col_width: Devvit.Blocks.SizeString;
   grow: boolean;
   children: Devvit.Fragment;
 };
 
 export default function ScoreBoardColumn(props: ScoreBoardColumnProps) {
-  const { UXConfig, col_name, col_width, grow, children } = props;
+  const { UXConfig, col_name, grow, children } = props;
   return (
     <vstack
       // border="thin"
       gap="none"
       // borderColor="grey"
-      width={col_width}
+      // width={col_width}
       padding="none"
       grow={grow}
     >

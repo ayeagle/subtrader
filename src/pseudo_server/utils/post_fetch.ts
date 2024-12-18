@@ -96,7 +96,8 @@ export async function genFilteredAdditionalTopPostsData(
   // console.log("Post data objkect");
   // console.log(postDataObject);
 
-  const filtered_sub_data = await genAdditionalPostsForSubreddit(
+  let filtered_sub_data: CurrSubData | null;
+  filtered_sub_data = await genAdditionalPostsForSubreddit(
     context,
     subredditName,
     lastCursor,
@@ -113,26 +114,41 @@ export async function genFilteredAdditionalTopPostsData(
     console.log(filtered_sub_data);
     printFetchLogs();
     // console.log("filtered posts is null");
-    return await genFilteredAdditionalTopPostsData(
+    const filtered_hot_posts_sub_data = await genFilteredAdditionalTopPostsData(
       context,
       subredditName,
-      "",
+      lastCursor,
       SubDataSource.HOT
     );
-    return null;
+    if (
+      !filtered_hot_posts_sub_data ||
+      filtered_hot_posts_sub_data.postData == null ||
+      filtered_hot_posts_sub_data.postData?.length === 0
+    ) {
+      const filtered_new_posts_sub_data =
+        await genFilteredAdditionalTopPostsData(
+          context,
+          subredditName,
+          lastCursor,
+          SubDataSource.HOT
+        );
+      filtered_sub_data = filtered_new_posts_sub_data;
+    } else {
+      filtered_sub_data = filtered_hot_posts_sub_data;
+    }
   }
-  const post_data = filtered_sub_data.postData.filter(Boolean) as PostData[];
+  const post_data = filtered_sub_data?.postData.filter(Boolean) as PostData[];
   const last_cursor = post_data[post_data.length - 1].id;
 
-  if (post_data.length < 100) {
-    console.log("Initiating new additional posts fetch");
-    return await genFilteredAdditionalTopPostsData(
-      context,
-      subredditName,
-      last_cursor,
-      SubDataSource.HOT
-    );
-  }
+  // if (post_data.length < 100) {
+  //   console.log("Initiating new additional posts fetch");
+  //   return await genFilteredAdditionalTopPostsData(
+  //     context,
+  //     subredditName,
+  //     last_cursor,
+  //     SubDataSource.HOT
+  //   );
+  // }
 
   const subData: CurrSubData = {
     name: subredditName,

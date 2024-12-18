@@ -72,7 +72,7 @@ export const add_new_and_calculate_score = (
   const result = scoreHistory.reduce(
     (acc, item) => acc + item.scoreChangeValue,
     BASE_SCORE
-  );
+  ) ;
 
   const modifier = getScoreModifier(new_selected.score, new_other.score);
 
